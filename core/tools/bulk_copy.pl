@@ -57,6 +57,7 @@ our %control = (
     itopic     => [], # List of topics to include (empty implies all topics)
     xtopic     => [], # List of topics to exclude
     latest     => [], # List of topics for which only the latest is to be copied
+    vhc_host   => undef, # Optional host for VirtualHostingContrib
     quiet      => 0,  # shhhh
     debug      => 0,  # OMG
     check_only => 0,  # If true, don't copy, just check
@@ -580,6 +581,7 @@ Getopt::Long::GetOptions(
     'itopic=s@' => $control{itopic},
     'xtopic=s@' => $control{xtopic},
     'latest=s@' => $control{latest},
+    'vhc-host|v=s' => \$control{vhc_host},
     'quietly'   => sub { $control{quiet} = 1 },
     'debug'     => sub { $control{debug} = 1 },
     'check'     => sub { $control{check_only} = 1 },
@@ -677,12 +679,22 @@ else {
     announce
       "Copying to $Foswiki::VERSION ($Foswiki::cfg{Store}{Implementation})";
 
-    $session = Foswiki->new();
+    my $doit = sub {
+        $session = Foswiki->new();
 
-    $/ = "\n";
-    while ( my $message = <FROM_A> ) {
-        last unless dispatch($message);
         $/ = "\n";
+        while ( my $message = <FROM_A> ) {
+            last unless dispatch($message);
+            $/ = "\n";
+        }
+    };
+
+    # If VirtualHostingContrib is used, run on specific host, see http://foswiki.org/Extensions/VirtualHostingContrib.
+    if ($control{vhc_host}) {
+        require Foswiki::Contrib::VirtualHostingContrib::VirtualHost;
+        Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($control{vhc_host}, $doit);
+    } else {
+        $doit->();
     }
 
     close FROM_A;
